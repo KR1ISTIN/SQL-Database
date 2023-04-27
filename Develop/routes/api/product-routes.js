@@ -74,24 +74,29 @@ router.post('/', async (req, res) => {
 });
 
 // update product
-router.put('/:id', (req, res) => {
-  
+router.put('/:id', async (req, res) => {
   // update product data
-  Product.update(req.body, {
-    where: {
-      id: req.params.id,
-    },
-  }).then((product) => {
-      // find all associated tags from ProductTag
+  await Product.update(
+    {  // everything we can update
+      product_name: req.body.product_name, 
+      price: req.body.price,
+      stock: req.body.stock,
+      category_id: req.body.category_id,
+      tag_id: [req.body.tag_id] 
+    }, // the product_id which is equal to the params.id
+    { where: { product_id: req.params.id } }
+  ).then((product) => {
+      console.log(product);
+      // find all associated tags from ProductTag 
       return ProductTag.findAll({ where: { product_id: req.params.id } });
     })
     .then((productTags) => {
       // get list of current tag_ids
-      const productTagIds = productTags.map(({ tag_id }) => tag_id);
+      const productTagIds = productTags.map(({ tag_id }) => tag_id); //mapping through  an array of tag_id assosciated with product
       // create filtered list of new tag_ids
-      const newProductTags = req.body.tagIds
-        .filter((tag_id) => !productTagIds.includes(tag_id))
-        .map((tag_id) => {
+      const newProductTags = req.body.tag_id // what tag_id did we pass is params
+        .filter((tag_id) => !productTagIds.includes(tag_id)) // filter tag_id and checking to see if its not included in array
+        .map((tag_id) => {  // each tag 
           return {
             product_id: req.params.id,
             tag_id,
@@ -99,18 +104,18 @@ router.put('/:id', (req, res) => {
         });
       // figure out which ones to remove
       const productTagsToRemove = productTags
-        .filter(({ tag_id }) => !req.body.tagIds.includes(tag_id))
-        .map(({ id }) => id);
+        .filter(({ tag_id }) => !req.body.tag_id.includes(tag_id))
+        .map(({ tag_id }) => tag_id);
 
       // run both actions
       return Promise.all([
-        ProductTag.destroy({ where: { id: productTagsToRemove } }),
+        ProductTag.destroy({ where: { product_id: productTagsToRemove } }),
         ProductTag.bulkCreate(newProductTags),
       ]);
     })
     .then((updatedProductTags) => res.json(updatedProductTags))
     .catch((err) => {
-      // console.log(err);
+      console.log(err);
       res.status(400).json(err);
     });
 });
